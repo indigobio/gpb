@@ -1854,13 +1854,13 @@ compute_map_translations(Defs, Opts) ->
           end,
           [],
           Defs),
-    MapsOrRecords = get_records_or_maps_by_opts(Opts),
+    MapsOrTuples = get_2tuples_or_maps_for_maptype_fields_by_opts(Opts),
     dict:from_list(
       lists:append(
         [begin
              MapAsMsgName = map_type_to_msg_name(KeyType, ValueType),
-             case MapsOrRecords of
-                 records ->
+             case MapsOrTuples of
+                 '2tuples' ->
                      [{[MsgName,FName,[]],
                        [{encode, {mt_maptuple_to_pseudomsg_r,
                                   ['$1',MapAsMsgName]}}]},
@@ -2022,8 +2022,8 @@ format_erl(Mod, Defs, #anres{maps_as_msgs=MapsAsMsgs}=AnRes, Opts) ->
        format_export_types(Defs, Opts),
        "\n",
        if not DoNif ->
-               case get_records_or_maps_by_opts(Opts) of
-                   records ->
+               case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+                   '2tuples' ->
                        ?f("~s~n", [fmt_maps_as_msgs_record_defs(AnRes)]);
                    maps ->
                        ""
@@ -2046,7 +2046,7 @@ format_erl(Mod, Defs, #anres{maps_as_msgs=MapsAsMsgs}=AnRes, Opts) ->
                              Defs, AnRes, Opts)]);
           not DoNif ->
                [?f("~s~n", [format_msg_encoders(Defs, AnRes, Opts, true)]),
-                ?f("~s~n", [format_msg_encoders(MapsAsMsgs,AnRes,Opts,false)]),
+                ?f("~s~n", [format_map_encoders(MapsAsMsgs,AnRes,Opts,false)]),
                 ?f("~s~n", [format_aux_encoders(Defs, AnRes, Opts)])]
        end,
        "\n",
@@ -2057,7 +2057,7 @@ format_erl(Mod, Defs, #anres{maps_as_msgs=MapsAsMsgs}=AnRes, Opts) ->
                              Defs, AnRes, Opts)]);
           not DoNif ->
                [?f("~s~n", [format_msg_decoders(Defs, AnRes, Opts)]),
-                ?f("~s~n", [format_msg_decoders(MapsAsMsgs, AnRes, Opts)]),
+                ?f("~s~n", [format_map_decoders(MapsAsMsgs, AnRes, Opts)]),
                 ?f("~s~n", [format_aux_decoders(Defs, AnRes, Opts)])]
        end,
        "\n",
@@ -2252,6 +2252,13 @@ format_enum_encoders(Defs, #anres{used_types=UsedTypes}) ->
                         || {EnumSym, EnumValue} <- EnumDef])])
      || {{enum, EnumName}, EnumDef} <- Defs,
         smember({enum,EnumName}, UsedTypes)].
+
+format_map_encoders(Defs, AnRes, Opts0, IncludeStarter) ->
+    Opts1 = case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts0) of
+                '2tuples' -> [{maps, false} | Opts0];
+                maps      -> [{maps, true} | Opts0]
+            end,
+    format_msg_encoders(Defs, AnRes, Opts1, IncludeStarter).
 
 format_msg_encoders(Defs, AnRes, Opts, IncludeStarter) ->
     [[format_msg_encoder(MsgName, MsgDef, Defs, AnRes, Opts, IncludeStarter)
@@ -3013,6 +3020,13 @@ format_enum_decoders(Defs, #anres{used_types=UsedTypes}) ->
                         || {EnumSym, EnumValue} <- unalias_enum(EnumDef)])])
      || {{enum, EnumName}, EnumDef} <- Defs,
         smember({enum,EnumName}, UsedTypes)].
+
+format_map_decoders(Defs, AnRes, Opts0) ->
+    Opts1 = case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts0) of
+                '2tuples' -> [{maps, false} | Opts0];
+                maps      -> [{maps, true} | Opts0]
+            end,
+    format_msg_decoders(Defs, AnRes, Opts1).
 
 format_msg_decoders(Defs, AnRes, Opts) ->
     [format_msg_decoder(MsgName, MsgDef, Defs, AnRes, Opts)
@@ -4907,11 +4921,11 @@ format_bytes_verifier() ->
        end)].
 
 format_map_verifiers(#anres{map_types=MapTypes}=AnRes, Opts) ->
-    RecordsOrMaps = get_records_or_maps_by_opts(Opts),
-    [format_map_verifier(KeyType, ValueType, RecordsOrMaps, AnRes)
+    MapsOrTuples = get_2tuples_or_maps_for_maptype_fields_by_opts(Opts),
+    [format_map_verifier(KeyType, ValueType, MapsOrTuples, AnRes)
      || {KeyType,ValueType} <- sets:to_list(MapTypes)].
 
-format_map_verifier(KeyType, ValueType, RecordsOrMaps, AnRes) ->
+format_map_verifier(KeyType, ValueType, MapsOrTuples, AnRes) ->
     MsgName = map_type_to_msg_name(KeyType, ValueType),
     FnName = mk_fn(v_, MsgName),
     KeyVerifierFn = mk_fn(v_type_, KeyType),
@@ -4939,8 +4953,8 @@ format_map_verifier(KeyType, ValueType, RecordsOrMaps, AnRes) ->
                  splice_trees('MaybeTrUserData', [])]
         end,
     [nowarn_dialyzer_attr(FnName, 3),
-     case RecordsOrMaps of
-         records ->
+     case MapsOrTuples of
+         '2tuples' ->
              gpb_codegen:format_fn(
                FnName,
                fun(KVs, Path, 'MaybeTrUserDataArg') when is_list(KVs) ->
@@ -5264,8 +5278,8 @@ format_default_translators(AnRes, Opts) ->
 format_default_map_translators(#anres{map_types=MapTypes}=AnRes, Opts) ->
     HaveMaps = sets:size(MapTypes) > 0,
     [%% Auxiliary helpers in case of fields of type map<_,_>
-     [case get_records_or_maps_by_opts(Opts) of
-          records ->
+     [case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+          '2tuples' ->
               [inline_attr(mt_maptuple_to_pseudomsg_r,2),
                gpb_codegen:format_fn(
                  mt_maptuple_to_pseudomsg_r,
@@ -5335,8 +5349,8 @@ format_default_map_translators(#anres{map_types=MapTypes}=AnRes, Opts) ->
 format_default_merge_translators(#anres{map_types=MapTypes}, Opts) ->
     HaveMaps = sets:size(MapTypes) > 0,
     [%% Auxiliary helpers in case of fields of type map<_,_>
-     case get_records_or_maps_by_opts(Opts) of
-         records ->
+     case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+         '2tuples' ->
              [inline_attr(mt_merge_maptuples_r,2),
               gpb_codegen:format_fn(
                 mt_merge_maptuples_r,
@@ -6046,9 +6060,9 @@ type_to_typestr_2({msg,M}, _Defs, Opts)   -> msg_to_typestr(M, Opts);
 type_to_typestr_2({map,KT,VT}, Defs, Opts) ->
     KTStr = type_to_typestr_2(KT, Defs, Opts),
     VTStr = type_to_typestr_2(VT, Defs, Opts),
-    case get_records_or_maps_by_opts(Opts) of
-        records -> ?f("[{~s, ~s}]", [KTStr, VTStr]);
-        maps    -> ?f("#{~s => ~s}", [KTStr, VTStr])
+    case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+        '2tuples' -> ?f("[{~s, ~s}]", [KTStr, VTStr]);
+        maps      -> ?f("#{~s => ~s}", [KTStr, VTStr])
     end.
 
 float_spec() ->
@@ -6273,8 +6287,8 @@ format_nif_cc_proto3_version_check_if_present(Defs) ->
     end.
 
 format_nif_cc_map_api_check_if_needed(Opts) ->
-    case get_records_or_maps_by_opts(Opts) of
-        records ->
+    case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+        '2tuples' ->
             "";
         maps ->
             %% The maps api functions appeared in erl_nif.h version 2.6,
@@ -7097,8 +7111,8 @@ format_nif_cc_field_packer_repeated(SrcVar, MsgVar, Field, Defs, Opts) ->
              [])]).
 
 format_nif_cc_field_packer_maptype(SrcVar, MsgVar, Field, Defs, Opts) ->
-    case get_records_or_maps_by_opts(Opts) of
-        records ->
+    case get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) of
+        '2tuples' ->
             format_nif_cc_field_packer_maptype_r(SrcVar, MsgVar, Field, Defs,
                                                  Opts);
         maps ->
@@ -7460,14 +7474,14 @@ format_nif_cc_field_unpacker_maptype(DestVar, MsgVar, Field, Defs, Opts) ->
     #?gpb_field{name=FName, type={map, KeyType, ValueType}=Type} = Field,
     LCFName = to_lower(FName),
     ItType = mk_cctype_name(Type, Defs) ++ "::const_iterator",
-    MapsOrRecords = get_records_or_maps_by_opts(Opts),
+    MapsOrTuples = get_2tuples_or_maps_for_maptype_fields_by_opts(Opts),
     split_indent_iolist(
       4,
       ["{\n",
        split_indent_iolist(
          4,
-         case MapsOrRecords of
-             records ->
+         case MapsOrTuples of
+             '2tuples' ->
                  [?f("~s = enif_make_list(env, 0);\n", [DestVar]),
                   ?f("int i = 0;\n", [])];
              maps ->
@@ -7487,8 +7501,8 @@ format_nif_cc_field_unpacker_maptype(DestVar, MsgVar, Field, Defs, Opts) ->
                                                Defs),
           format_nif_cc_field_unpacker_by_type("ev", "it->second", ValueType,
                                                Defs),
-          case MapsOrRecords of
-              records ->
+          case MapsOrTuples of
+              '2tuples' ->
                   ["ERL_NIF_TERM eitem = enif_make_tuple2(env, ek, ev);\n",
                    ?f("~s = enif_make_list_cell(env, eitem, ~s);\n",
                       [DestVar, DestVar]),
@@ -7755,6 +7769,12 @@ get_mapping_and_unset_by_opts(Opts) ->
         maps ->
             Default = present_undefined,
             {maps, proplists:get_value(maps_unset_optional, Opts, Default)}
+    end.
+
+get_2tuples_or_maps_for_maptype_fields_by_opts(Opts) ->
+    case get_records_or_maps_by_opts(Opts) of
+        records -> '2tuples';
+        maps    -> maps
     end.
 
 %% records

@@ -179,7 +179,7 @@ Mapping of protocol buffer datatypes to erlang
 <tbody>
 <!-- = = = = = = = = = = = = = = = = = = = = = = = = = = = -->
 <tr><td>double, float</td>
-    <td>float() | infinity | '-infinity' | nan<br/>
+    <td>float() | '+inf' | '-inf' | nan<br/>
         When encoding, integers, too, are accepted</td></tr>
 <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
 <tr><td>   int32,    int64<br/>

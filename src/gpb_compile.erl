@@ -2877,9 +2877,9 @@ format_packed_float_encoder(FnName) ->
       FnName,
       fun([V | Rest], Bin) when is_number(V) ->
               call_self(Rest, <<Bin/binary, V:32/little-float>>);
-         ([infinity | Rest], Bin) ->
+         (['+inf' | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:16,128,127>>);
-         (['-infinity' | Rest], Bin) ->
+         (['-inf' | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:16,128,255>>);
          ([nan | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:16,192,127>>);
@@ -2893,9 +2893,9 @@ format_packed_double_encoder(FnName) ->
       FnName,
       fun([V | Rest], Bin) when is_number(V) ->
               call_self(Rest, <<Bin/binary, V:64/float-little>>);
-         ([infinity | Rest], Bin) ->
+         (['+inf' | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:48,240,127>>);
-         (['-infinity' | Rest], Bin) ->
+         (['-inf' | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:48,240,255>>);
          ([nan | Rest], Bin) ->
               call_self(Rest, <<Bin/binary, 0:48,248,127>>);
@@ -2908,8 +2908,8 @@ format_float_encoder(Type) ->
     gpb_codegen:format_fn(
       mk_fn(e_type_, Type),
       fun(V, Bin) when is_number(V) -> <<Bin/binary, V:32/little-float>>;
-         (infinity, Bin)            -> <<Bin/binary, 0:16,128,127>>;
-         ('-infinity', Bin)         -> <<Bin/binary, 0:16,128,255>>;
+         ('+inf', Bin)            -> <<Bin/binary, 0:16,128,127>>;
+         ('-inf', Bin)         -> <<Bin/binary, 0:16,128,255>>;
          (nan, Bin)                 -> <<Bin/binary, 0:16,192,127>>
       end,
       []).
@@ -2918,8 +2918,8 @@ format_double_encoder(Type) ->
     gpb_codegen:format_fn(
       mk_fn(e_type_, Type),
       fun(V, Bin) when is_number(V) -> <<Bin/binary, V:64/little-float>>;
-         (infinity, Bin)            -> <<Bin/binary, 0:48,240,127>>;
-         ('-infinity', Bin)         -> <<Bin/binary, 0:48,240,255>>;
+         ('+inf', Bin)            -> <<Bin/binary, 0:48,240,127>>;
+         ('-inf', Bin)         -> <<Bin/binary, 0:48,240,255>>;
          (nan, Bin)                 -> <<Bin/binary, 0:48,248,127>>
       end,
       []).
@@ -3580,9 +3580,9 @@ format_dpacked_nonvi(MsgName, #?gpb_field{name=FName}, 32, float) ->
     gpb_codegen:format_fn(
       mk_fn(d_packed_field_, MsgName, FName),
       fun(<<0:16,128,127, Rest/binary>>, Z1, Z2, AccSeq) ->
-              call_self(Rest, Z1, Z2, [infinity | AccSeq]);
+              call_self(Rest, Z1, Z2, ['+inf' | AccSeq]);
          (<<0:16,128,255, Rest/binary>>, Z1, Z2, AccSeq) ->
-              call_self(Rest, Z1, Z2, ['-infinity' | AccSeq]);
+              call_self(Rest, Z1, Z2, ['-inf' | AccSeq]);
          (<<_:16,1:1,_:7,_:1,127:7, Rest/binary>>, Z1, Z2, AccSeq) ->
               call_self(Rest, Z1, Z2, [nan | AccSeq]);
          (<<Value:32/little-float, Rest/binary>>, Z1, Z2, AccSeq) ->
@@ -3595,9 +3595,9 @@ format_dpacked_nonvi(MsgName, #?gpb_field{name=FName}, 64, double) ->
     gpb_codegen:format_fn(
       mk_fn(d_packed_field_, MsgName, FName),
       fun(<<0:48,240,127, Rest/binary>>, Z1, Z2, AccSeq) ->
-              call_self(Rest, Z1, Z2, [infinity | AccSeq]);
+              call_self(Rest, Z1, Z2, ['+inf' | AccSeq]);
          (<<0:48,240,255, Rest/binary>>, Z1, Z2, AccSeq) ->
-              call_self(Rest, Z1, Z2, ['-infinity' | AccSeq]);
+              call_self(Rest, Z1, Z2, ['-inf' | AccSeq]);
          (<<_:48,15:4,_:4,_:1,127:7, Rest/binary>>, Z1, Z2, AccSeq) ->
               call_self(Rest, Z1, Z2, [nan | AccSeq]);
          (<<Value:64/little-float, Rest/binary>>, Z1, Z2, AccSeq) ->
@@ -4064,8 +4064,8 @@ format_floating_point_field_decoder(MsgName, XFieldDef, Type, AnRes, Opts) ->
                                                     OutExpr, PrevValue, Params,
                                                     TrUserDataVar, Opts))
          || {Marker, OutExpr} <- [{'OutParams', ?expr(Value)},
-                                  {'InfinityOutParams', ?expr(infinity)},
-                                  {'-InfinityOutParams', ?expr('-infinity')},
+                                  {'InfinityOutParams', ?expr('+inf')},
+                                  {'-InfinityOutParams', ?expr('-inf')},
                                   {'NanOutParams', ?expr(nan)}]],
     ReadFieldDefFnName = mk_fn(dfp_read_field_def_, MsgName),
     Replacements =
@@ -4938,8 +4938,8 @@ format_float_verifier(FlType) ->
           %% So let verify accept integers too.
           %% When such a value is unpacked, we get a float.
           (N, _Path) when is_integer(N) -> ok;
-          (infinity, _Path)    -> ok;
-          ('-infinity', _Path) -> ok;
+          ('+inf', _Path)    -> ok;
+          ('-inf', _Path)    -> ok;
           (nan, _Path)         -> ok;
           (X, Path)            -> mk_type_error('<bad_x_value>', X, Path)
        end,
@@ -6122,7 +6122,7 @@ type_to_typestr_2({map,KT,VT}, Defs, Opts) ->
     end.
 
 float_spec() ->
-    "float() | integer() | infinity | '-infinity' | nan".
+    "float() | integer() | '+inf' | '-inf' | nan".
 
 msg_to_typestr(M, Opts) ->
   case get_records_or_maps_by_opts(Opts) of
@@ -6390,7 +6390,7 @@ format_nif_cc_mk_atoms(_Mod, Defs, AnRes, Opts) ->
                      false -> MiscAtoms0
                  end,
     MiscAtoms2 = case is_any_field_of_type_float_or_double(AnRes) of
-                     true  -> MiscAtoms1 ++ [infinity, '-infinity', nan];
+                     true  -> MiscAtoms1 ++ ['+inf', '-inf', nan];
                      false -> MiscAtoms1
                  end,
     FieldAtoms = if Maps ->
@@ -6433,6 +6433,8 @@ format_nif_cc_mk_consts(_Mod, _Defs, AnRes, _Opts) ->
 
 minus_to_m(A) ->
     case atom_to_list(A) of
+        "+inf"    -> "infinity";
+        "-inf"    -> "minfinity";
         "-"++Rest -> "m"++Rest;
         _         -> A
     end.

@@ -2029,7 +2029,7 @@ nif_with_non_normal_floats() ->
                              ?assertEqual(OrigMsg, GMDecoded),
                              ?assertEqual(OrigMsg, MGDecoded)
                          end
-                         || Item <- [infinity, '-infinity', nan]]
+                         || Item <- ['+inf', '-inf', nan]]
                 end)
       end).
 

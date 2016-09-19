@@ -325,9 +325,9 @@ decode_type(FieldType, Bin, MsgDefs) ->
         double ->
             case Bin of
                 <<?PLUS_INF_64le_BITPATTERN, Rest/binary>> ->
-                    {infinity, Rest};
+                    {'+inf', Rest};
                 <<?MINUS_INF_64le_BITPATTERN, Rest/binary>> ->
-                    {'-infinity', Rest};
+                    {'-inf', Rest};
                 <<?NAN_64le_BITPATTERN_match, Rest/binary>> ->
                     {nan, Rest};
                 <<N:64/little-float, Rest/binary>> ->
@@ -354,9 +354,9 @@ decode_type(FieldType, Bin, MsgDefs) ->
         float ->
             case Bin of
                 <<?PLUS_INF_32le_BITPATTERN, Rest/binary>> ->
-                    {infinity, Rest};
+                    {'+inf', Rest};
                 <<?MINUS_INF_32le_BITPATTERN, Rest/binary>> ->
-                    {'-infinity', Rest};
+                    {'-inf', Rest};
                 <<?NAN_32le_BITPATTERN_match, Rest/binary>> ->
                     {nan, Rest};
                 <<N:32/little-float, Rest/binary>> ->
@@ -619,8 +619,8 @@ encode_value(Value, Type, MsgDefs)                                             -
         double ->
             case Value of
                 nan         -> <<?NAN_64le_BITPATTERN_make>>;
-                infinity    -> <<?PLUS_INF_64le_BITPATTERN>>;
-                '-infinity' -> <<?MINUS_INF_64le_BITPATTERN>>;
+                '+inf'      -> <<?PLUS_INF_64le_BITPATTERN>>;
+                '-inf'      -> <<?MINUS_INF_64le_BITPATTERN>>;
                 _           -> <<Value:64/float-little>>
             end;
         string ->
@@ -643,8 +643,8 @@ encode_value(Value, Type, MsgDefs)                                             -
         float ->
             case Value of
                 nan         -> <<?NAN_32le_BITPATTERN_make>>;
-                infinity    -> <<?PLUS_INF_32le_BITPATTERN>>;
-                '-infinity' -> <<?MINUS_INF_32le_BITPATTERN>>;
+                '+inf'      -> <<?PLUS_INF_32le_BITPATTERN>>;
+                '-inf'      -> <<?MINUS_INF_32le_BITPATTERN>>;
                 _           -> <<Value:32/float-little>>
             end;
         {map,KeyType,ValueType} ->
@@ -809,8 +809,8 @@ verify_bool(V, Path) ->
 verify_float(V, _) when is_float(V) -> ok;
 verify_float(V, _) when is_integer(V) -> ok;
 verify_float(nan, _) -> ok;
-verify_float(infinity, _) -> ok;
-verify_float('-infinity', _) -> ok;
+verify_float('+inf', _) -> ok;
+verify_float('-inf', _) -> ok;
 verify_float(V, Path) ->
     mk_type_error(bad_floating_point_value, V, Path).
 
